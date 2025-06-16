@@ -1,52 +1,47 @@
-name: Download boot files for RK322x
+name: Generate boot.scr for RK322x
 
 on:
   workflow_dispatch:
   push:
     branches: [ main ]
-  pull_request:
 
 jobs:
-  download-boot-files:
+  generate-boot-scr:
     runs-on: ubuntu-latest
     
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
-      
-    - name: Download boot files
+    - name: Set up environment
       run: |
-        # Create directory structure
+        sudo apt-get update
+        sudo apt-get install -y u-boot-tools
+        
+    - name: Create boot.cmd
+      run: |
+        cat << 'EOF' > boot.cmd
+        # Boot script for RK322x
+        setenv bootargs "earlyprintk console=ttyS2,115200n8 console=tty1 root=PARTUUID=${uuid} rw rootwait rootfstype=ext4"
+        load mmc 0:1 ${kernel_addr_r} /boot/zImage
+        load mmc 0:1 ${fdt_addr_r} /boot/dtb/${fdtfile}
+        bootz ${kernel_addr_r} - ${fdt_addr_r}
+        EOF
+        
+    - name: Generate boot.scr
+      run: |
         mkdir -p output/images
+        mkimage -C none -A arm -T script -d boot.cmd output/images/boot.scr
         
-        # Try multiple possible locations for boot.scr
-        possible_paths=(
-          "https://github.com/CodeBoomAI/armbian-build-rk322x/raw/main/boot.scr"
-          "https://github.com/CodeBoomAI/armbian-build-rk322x/raw/main/images/boot.scr"
-          "https://github.com/CodeBoomAI/armbian-build-rk322x/raw/main/output/boot.scr"
-        )
-        
-        for url in "${possible_paths[@]}"; do
-          echo "Trying to download from: $url"
-          if wget "$url" -O output/images/boot.scr; then
-            echo "Successfully downloaded boot.scr"
-            break
-          fi
-        done
-        
-        # Verify downloaded file
-        if [ ! -f "output/images/boot.scr" ]; then
-          echo "Error: Could not find boot.scr in any known location"
+    - name: Verify file
+      run: |
+        if [ ! -s "output/images/boot.scr" ]; then
+          echo "Error: boot.scr is empty or missing!"
           exit 1
         fi
-        
-        echo "File downloaded successfully:"
+        echo "File generated successfully:"
         ls -lh output/images/boot.scr
         file output/images/boot.scr
         
-    - name: Upload boot files
+    - name: Upload artifact
       uses: actions/upload-artifact@v4
       with:
         name: boot-files
         path: output/images/boot.scr
-        retention-days: 5
