@@ -36,19 +36,23 @@ jobs:
         
     - name: Build for RK322x
       run: |
-        # Set non-interactive environment
+        # Force non-interactive mode for all configuration
         export DEBIAN_FRONTEND=noninteractive
+        export BUILD_MINIMAL=no
+        export BUILD_DESKTOP=no
+        export KERNEL_CONFIGURE=no
+        export BSP_BUILD_ONLY=yes
+        export MINIMAL_IMAGE=no
+        export NO_HOST_RELEASE_CHECK=yes
+        export SKIP_EXTERNAL_TOOLCHAINS=yes
         
-        # Build with forced non-interactive options
+        # Run build with all interactive options disabled
         ./compile.sh \
           BOARD=rk322x-box \
           BRANCH=current \
-          BUILD_DESKTOP=no \
           RELEASE=jammy \
-          KERNEL_CONFIGURE=no \
-          BSP_BUILD_ONLY=yes \
-          NO_HOST_RELEASE_CHECK=yes \
-          SKIP_EXTERNAL_TOOLCHAINS=yes
+          CLEAN_LEVEL="make,debs" \
+          LOG_SUBPATH="github-actions" 2>&1 | tee build.log
         
     - name: Upload artifacts
       uses: actions/upload-artifact@v4
@@ -58,5 +62,6 @@ jobs:
           output/debs/linux-*
           output/debs/u-boot-*
           output/images/u-boot-*
+          build.log
         if-no-files-found: error
         retention-days: 5
