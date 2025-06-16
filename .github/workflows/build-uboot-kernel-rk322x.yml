@@ -1,0 +1,51 @@
+name: Build RK322x U-Boot and Kernel
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 180
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+      with:
+        submodules: recursive
+        
+    - name: Set up QEMU
+      uses: docker/setup-qemu-action@v2
+      
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y git build-essential bc libncurses5-dev debootstrap \
+        qemu-user-static dosfstools gparted rsync unzip parted pv \
+        curl gcc-aarch64-linux-gnu device-tree-compiler
+        
+    - name: Build Armbian for RK322x
+      run: |
+        # Set up build environment
+        sudo ./compile.sh REQUIREMENTS
+        
+        # Start the build process
+        ./compile.sh \
+          BOARD=rk322x-box \
+          BRANCH=current \
+          RELEASE=jammy \
+          BUILD_MINIMAL=no \
+          BUILD_DESKTOP=no \
+          KERNEL_ONLY=yes \
+          KERNEL_CONFIGURE=no \
+          BSP_BUILD_ONLY=yes
+        
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: rk322x-build-artifacts
+        path: |
+          output/debs/
+          output/images/
+        if-no-files-found: error
+        retention-days: 5
