@@ -16,20 +16,29 @@ jobs:
       
     - name: Download boot.scr
       run: |
-        # Download boot.scr dari repo CodeBoomAI
+        # Download boot.scr from CodeBoomAI repository
         wget https://github.com/CodeBoomAI/armbian-build-rk322x/raw/main/output/images/boot.scr
         
-        # Verifikasi file yang didownload
+        # Verify downloaded file
         if [ ! -f "boot.scr" ]; then
           echo "Error: boot.scr not downloaded!"
           exit 1
         fi
         
-        echo "File boot.scr downloaded successfully"
+        # Check file size to ensure proper download
+        file_size=$(stat -c%s "boot.scr")
+        if [ "$file_size" -lt 1024 ]; then
+          echo "Error: Downloaded file seems too small (only $file_size bytes)"
+          exit 1
+        fi
+        
+        echo "File boot.scr downloaded successfully:"
         ls -lh boot.scr
+        file boot.scr
         
     - name: Upload boot.scr as artifact
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: boot-scr-file
         path: boot.scr
+        retention-days: 5
