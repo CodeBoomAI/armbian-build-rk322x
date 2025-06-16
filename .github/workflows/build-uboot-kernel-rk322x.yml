@@ -14,43 +14,41 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v4
       
-    - name: Set up environment
+    - name: Install dependencies
       run: |
         sudo apt-get update
         sudo apt-get install -y \
           git build-essential bc binutils bison flex \
           libssl-dev libncurses5-dev \
           parted debootstrap debian-archive-keyring \
-          qemu-user-static dosfstools
-    
-    - name: Build Armbian
-      run: |
-        # Set non-interactive environment
-        export DEBIAN_FRONTEND=noninteractive
-        export BUILD_OPTIONS="noconfig"
-        export FORCE_BOOTSCRIPT_UPDATE="no"
-        export SHOW_DEBUG=yes
+          qemu-user-static dosfstools \
+          u-boot-tools device-tree-compiler
         
-        # Fix potential line endings
+    - name: Fix line endings
+      run: |
         find . -type f -name "*.sh" -exec sed -i 's/\r$//' {} \;
         
-        # Build kernel
+    - name: Build Armbian image
+      run: |
+        export DEBIAN_FRONTEND=noninteractive
+        export BUILD_OPTIONS="noconfig"
+        export FORCE_BOOTSCRIPT_UPDATE="yes"
+        
+        # Build complete image (includes kernel and u-boot)
         ./compile.sh \
           BOARD=rk322x-box \
           BRANCH=current \
           KERNEL_CONFIGURE=no \
-          LOG_SUBPATH="github-actions" \
-          kernel 2>&1 | tee kernel-build.log
+          RELEASE=jammy \
+          BUILD_MINIMAL=yes \
+          BUILD_DESKTOP=no \
+          LOG_SUBPATH="github-actions" 2>&1 | tee build.log
         
-        # Build U-Boot
-        ./compile.sh \
-          BOARD=rk322x-box \
-          BRANCH=current \
-          u-boot 2>&1 | tee u-boot-build.log
-        
-        # Generate boot.scr
-        echo -e 'setenv bootargs "console=ttyS2,115200n8 root=PARTUUID=${uuid} rw rootwait"\nload mmc 0:1 ${kernel_addr_r} /boot/zImage\nload mmc 0:1 ${fdt_addr_r} /boot/dtb/${fdtfile}\nbootz ${kernel_addr_r} - ${fdt_addr_r}' > boot.cmd
-        mkimage -C none -A arm -T script -d boot.cmd boot.scr
+        # Generate boot.scr if not auto-generated
+        if [ ! -f "output/images/boot.scr" ]; then
+          echo -e 'setenv bootargs "console=ttyS2,115200n8 root=PARTUUID=${uuid} rw rootwait"\nload mmc 0:1 ${kernel_addr_r} /boot/zImage\nload mmc 0:1 ${fdt_addr_r} /boot/dtb/${fdtfile}\nbootz ${kernel_addr_r} - ${fdt_addr_r}' > boot.cmd
+          mkimage -C none -A arm -T script -d boot.cmd output/images/boot.scr
+        fi
         
     - name: Upload artifacts
       uses: actions/upload-artifact@v4
@@ -58,6 +56,5 @@ jobs:
         name: armbian-build
         path: |
           output/images/*
-          *.log
-          boot.scr
+          build.log
         retention-days: 3
