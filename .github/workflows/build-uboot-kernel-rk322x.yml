@@ -34,48 +34,46 @@ jobs:
         
         pip3 install --user pyyaml
         
-    - name: Configure non-interactive build
+    - name: Patch Armbian build system
       run: |
-        # Create complete configuration file
+        # Completely disable interactive dialogs by patching the source
+        sed -i 's/dialog_if_terminal_set_vars/# dialog_if_terminal_set_vars/g' lib/functions/configuration/menu.sh
+        sed -i 's/interactive_config_ask_/# interactive_config_ask_/g' lib/functions/configuration/interactive.sh
+        sed -i 's/config_possibly_interactive_/# config_possibly_interactive_/g' lib/functions/main/config-interactive.sh
+        
+        # Create forced answers file
         mkdir -p userpatches
         cat <<EOF > userpatches/answers.conf
-        # Disable all interactive prompts
+        KERNEL_CONFIGURE=no
         BUILD_MINIMAL=no
         BUILD_DESKTOP=no
-        KERNEL_CONFIGURE=no
         MINIMAL_IMAGE=no
         BSP_BUILD_ONLY=yes
         EXPERT=yes
         DIALOG_RC=no
         DISABLE_DIALOG=yes
-        NO_HOST_RELEASE_CHECK=yes
-        SKIP_EXTERNAL_TOOLCHAINS=yes
-        KERNEL_KEEP_CONFIG=no
-        FORCE_BOOTSCRIPT_UPDATE=no
-        BUILD_OPTIONS=noconfig
-        # Kernel configuration
-        LINUXCONFIG=default
-        # Image configuration
-        IMAGE_TYPE=user-built
-        COMPRESS_OUTPUTIMAGE=sha,gpg,img
-        # Build settings
-        CLEAN_LEVEL=make,debs
         EOF
         
     - name: Run build
       run: |
-        # Set environment for non-interactive build
         export DEBIAN_FRONTEND=noninteractive
         export BUILD_OPTIONS="noconfig"
         export FORCE_BOOTSCRIPT_UPDATE="no"
         export SHOW_DEBUG=yes
         
-        # Run build with all interactive elements disabled
+        # Use direct kernel build command instead of standard build
         ./compile.sh \
+          kernel \
           BOARD=rk322x-box \
           BRANCH=current \
-          RELEASE=jammy \
+          KERNEL_CONFIGURE=no \
           LOG_SUBPATH="github-actions" 2>&1 | tee build.log
+        
+        # Build U-Boot separately
+        ./compile.sh \
+          u-boot \
+          BOARD=rk322x-box \
+          BRANCH=current
         
     - name: Upload artifacts
       uses: actions/upload-artifact@v4
