@@ -36,19 +36,27 @@ jobs:
         
     - name: Build for RK322x
       run: |
-        # Build both kernel and u-boot together
+        # Set non-interactive environment
+        export DEBIAN_FRONTEND=noninteractive
+        
+        # Build with forced non-interactive options
         ./compile.sh \
           BOARD=rk322x-box \
           BRANCH=current \
           BUILD_DESKTOP=no \
-          RELEASE=jammy
+          RELEASE=jammy \
+          KERNEL_CONFIGURE=no \
+          BSP_BUILD_ONLY=yes \
+          NO_HOST_RELEASE_CHECK=yes \
+          SKIP_EXTERNAL_TOOLCHAINS=yes
         
     - name: Upload artifacts
       uses: actions/upload-artifact@v4
       with:
         name: rk322x-build-artifacts
         path: |
-          output/debs/
-          output/images/
+          output/debs/linux-*
+          output/debs/u-boot-*
+          output/images/u-boot-*
         if-no-files-found: error
         retention-days: 5
