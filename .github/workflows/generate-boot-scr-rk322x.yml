@@ -1,0 +1,35 @@
+name: Download boot.scr for RK322x
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+  pull_request:
+
+jobs:
+  download-boot-scr:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      
+    - name: Download boot.scr
+      run: |
+        # Download boot.scr dari repo CodeBoomAI
+        wget https://github.com/CodeBoomAI/armbian-build-rk322x/raw/main/output/images/boot.scr
+        
+        # Verifikasi file yang didownload
+        if [ ! -f "boot.scr" ]; then
+          echo "Error: boot.scr not downloaded!"
+          exit 1
+        fi
+        
+        echo "File boot.scr downloaded successfully"
+        ls -lh boot.scr
+        
+    - name: Upload boot.scr as artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: boot-scr-file
+        path: boot.scr
