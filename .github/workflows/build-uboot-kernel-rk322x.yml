@@ -1,4 +1,4 @@
-name: Build RK322x U-Boot and Kernel
+name: Build RK322x Kernel and U-Boot
 
 on:
   push:
@@ -32,20 +32,21 @@ jobs:
           libssl-dev liblz4-tool zlib1g-dev \
           flex bison libelf-dev dwarves
         
-        # Install additional Python dependencies
         pip3 install --user pyyaml
         
-    - name: Build Armbian for RK322x
+    - name: Build Kernel for RK322x
       run: |
-        # Start the build process directly
         ./compile.sh \
+          kernel \
           BOARD=rk322x-box \
-          BRANCH=current \
-          RELEASE=jammy \
-          BUILD_MINIMAL=no \
-          BUILD_DESKTOP=no \
-          KERNEL_ONLY=yes \
-          KERNEL_CONFIGURE=no
+          BRANCH=current
+        
+    - name: Build U-Boot for RK322x
+      run: |
+        ./compile.sh \
+          u-boot \
+          BOARD=rk322x-box \
+          BRANCH=current
         
     - name: Upload artifacts
       uses: actions/upload-artifact@v4
