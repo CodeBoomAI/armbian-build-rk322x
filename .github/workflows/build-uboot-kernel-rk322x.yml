@@ -34,36 +34,48 @@ jobs:
         
         pip3 install --user pyyaml
         
-    - name: Build for RK322x
+    - name: Configure non-interactive build
       run: |
-        # Create pre-configured answers file to skip all interactive prompts
+        # Create complete configuration file
         mkdir -p userpatches
-        cat <<EOF > userpatches/config-github-actions.conf
+        cat <<EOF > userpatches/answers.conf
+        # Disable all interactive prompts
         BUILD_MINIMAL=no
         BUILD_DESKTOP=no
         KERNEL_CONFIGURE=no
         MINIMAL_IMAGE=no
         BSP_BUILD_ONLY=yes
-        KERNEL_KEEP_CONFIG=no
         EXPERT=yes
         DIALOG_RC=no
         DISABLE_DIALOG=yes
         NO_HOST_RELEASE_CHECK=yes
         SKIP_EXTERNAL_TOOLCHAINS=yes
+        KERNEL_KEEP_CONFIG=no
+        FORCE_BOOTSCRIPT_UPDATE=no
+        BUILD_OPTIONS=noconfig
+        # Kernel configuration
+        LINUXCONFIG=default
+        # Image configuration
+        IMAGE_TYPE=user-built
+        COMPRESS_OUTPUTIMAGE=sha,gpg,img
+        # Build settings
+        CLEAN_LEVEL=make,debs
         EOF
         
-        # Run build with forced non-interactive mode
+    - name: Run build
+      run: |
+        # Set environment for non-interactive build
         export DEBIAN_FRONTEND=noninteractive
         export BUILD_OPTIONS="noconfig"
         export FORCE_BOOTSCRIPT_UPDATE="no"
+        export SHOW_DEBUG=yes
         
+        # Run build with all interactive elements disabled
         ./compile.sh \
           BOARD=rk322x-box \
           BRANCH=current \
           RELEASE=jammy \
-          CLEAN_LEVEL="make,debs" \
-          LOG_SUBPATH="github-actions" \
-          SKIP_LOG_ARCHIVE=yes 2>&1 | tee build.log
+          LOG_SUBPATH="github-actions" 2>&1 | tee build.log
         
     - name: Upload artifacts
       uses: actions/upload-artifact@v4
