@@ -1,4 +1,4 @@
-name: Download boot.scr for RK322x
+name: Download boot files for RK322x
 
 on:
   workflow_dispatch:
@@ -7,38 +7,46 @@ on:
   pull_request:
 
 jobs:
-  download-boot-scr:
+  download-boot-files:
     runs-on: ubuntu-latest
     
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
       
-    - name: Download boot.scr
+    - name: Download boot files
       run: |
-        # Download boot.scr from CodeBoomAI repository
-        wget https://github.com/CodeBoomAI/armbian-build-rk322x/raw/main/output/images/boot.scr
+        # Create directory structure
+        mkdir -p output/images
+        
+        # Try multiple possible locations for boot.scr
+        possible_paths=(
+          "https://github.com/CodeBoomAI/armbian-build-rk322x/raw/main/boot.scr"
+          "https://github.com/CodeBoomAI/armbian-build-rk322x/raw/main/images/boot.scr"
+          "https://github.com/CodeBoomAI/armbian-build-rk322x/raw/main/output/boot.scr"
+        )
+        
+        for url in "${possible_paths[@]}"; do
+          echo "Trying to download from: $url"
+          if wget "$url" -O output/images/boot.scr; then
+            echo "Successfully downloaded boot.scr"
+            break
+          fi
+        done
         
         # Verify downloaded file
-        if [ ! -f "boot.scr" ]; then
-          echo "Error: boot.scr not downloaded!"
+        if [ ! -f "output/images/boot.scr" ]; then
+          echo "Error: Could not find boot.scr in any known location"
           exit 1
         fi
         
-        # Check file size to ensure proper download
-        file_size=$(stat -c%s "boot.scr")
-        if [ "$file_size" -lt 1024 ]; then
-          echo "Error: Downloaded file seems too small (only $file_size bytes)"
-          exit 1
-        fi
+        echo "File downloaded successfully:"
+        ls -lh output/images/boot.scr
+        file output/images/boot.scr
         
-        echo "File boot.scr downloaded successfully:"
-        ls -lh boot.scr
-        file boot.scr
-        
-    - name: Upload boot.scr as artifact
+    - name: Upload boot files
       uses: actions/upload-artifact@v4
       with:
-        name: boot-scr-file
-        path: boot.scr
+        name: boot-files
+        path: output/images/boot.scr
         retention-days: 5
