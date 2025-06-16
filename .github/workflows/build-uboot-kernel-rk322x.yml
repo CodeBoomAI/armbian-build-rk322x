@@ -34,19 +34,14 @@ jobs:
         
         pip3 install --user pyyaml
         
-    - name: Build Kernel for RK322x
+    - name: Build for RK322x
       run: |
+        # Build both kernel and u-boot together
         ./compile.sh \
-          kernel \
           BOARD=rk322x-box \
-          BRANCH=current
-        
-    - name: Build U-Boot for RK322x
-      run: |
-        ./compile.sh \
-          u-boot \
-          BOARD=rk322x-box \
-          BRANCH=current
+          BRANCH=current \
+          BUILD_DESKTOP=no \
+          RELEASE=jammy
         
     - name: Upload artifacts
       uses: actions/upload-artifact@v4
