@@ -1,88 +1,63 @@
-name: Build RK322x Kernel and U-Boot
+name: Build Armbian for RK322x
 
 on:
+  workflow_dispatch:
   push:
     branches: [ main ]
-  pull_request:
-    branches: [ main ]
-  workflow_dispatch:
 
 jobs:
-  build:
-    runs-on: ubuntu-22.04
-    timeout-minutes: 180
+  build-armbian:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
     
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
-      with:
-        submodules: recursive
-        
-    - name: Set up QEMU
-      uses: docker/setup-qemu-action@v3
       
-    - name: Install dependencies
+    - name: Set up environment
       run: |
         sudo apt-get update
         sudo apt-get install -y \
-          git build-essential bc libncurses5-dev debootstrap \
-          qemu-user-static dosfstools gparted rsync unzip parted pv \
-          curl gcc-aarch64-linux-gnu device-tree-compiler \
-          python3-dev python3-pip python3-venv \
-          libssl-dev liblz4-tool zlib1g-dev \
-          flex bison libelf-dev dwarves
-        
-        pip3 install --user pyyaml
-        
-    - name: Patch Armbian build system
+          git build-essential bc binutils bison flex \
+          libssl-dev libncurses5-dev \
+          parted debootstrap debian-archive-keyring \
+          qemu-user-static dosfstools
+    
+    - name: Build Armbian
       run: |
-        # Completely disable interactive dialogs by patching the source
-        sed -i 's/dialog_if_terminal_set_vars/# dialog_if_terminal_set_vars/g' lib/functions/configuration/menu.sh
-        sed -i 's/interactive_config_ask_/# interactive_config_ask_/g' lib/functions/configuration/interactive.sh
-        sed -i 's/config_possibly_interactive_/# config_possibly_interactive_/g' lib/functions/main/config-interactive.sh
-        
-        # Create forced answers file
-        mkdir -p userpatches
-        cat <<EOF > userpatches/answers.conf
-        KERNEL_CONFIGURE=no
-        BUILD_MINIMAL=no
-        BUILD_DESKTOP=no
-        MINIMAL_IMAGE=no
-        BSP_BUILD_ONLY=yes
-        EXPERT=yes
-        DIALOG_RC=no
-        DISABLE_DIALOG=yes
-        EOF
-        
-    - name: Run build
-      run: |
+        # Set non-interactive environment
         export DEBIAN_FRONTEND=noninteractive
         export BUILD_OPTIONS="noconfig"
         export FORCE_BOOTSCRIPT_UPDATE="no"
         export SHOW_DEBUG=yes
         
-        # Use direct kernel build command instead of standard build
+        # Fix potential line endings
+        find . -type f -name "*.sh" -exec sed -i 's/\r$//' {} \;
+        
+        # Build kernel
         ./compile.sh \
-          kernel \
           BOARD=rk322x-box \
           BRANCH=current \
           KERNEL_CONFIGURE=no \
-          LOG_SUBPATH="github-actions" 2>&1 | tee build.log
+          LOG_SUBPATH="github-actions" \
+          kernel 2>&1 | tee kernel-build.log
         
-        # Build U-Boot separately
+        # Build U-Boot
         ./compile.sh \
-          u-boot \
           BOARD=rk322x-box \
-          BRANCH=current
+          BRANCH=current \
+          u-boot 2>&1 | tee u-boot-build.log
+        
+        # Generate boot.scr
+        echo -e 'setenv bootargs "console=ttyS2,115200n8 root=PARTUUID=${uuid} rw rootwait"\nload mmc 0:1 ${kernel_addr_r} /boot/zImage\nload mmc 0:1 ${fdt_addr_r} /boot/dtb/${fdtfile}\nbootz ${kernel_addr_r} - ${fdt_addr_r}' > boot.cmd
+        mkimage -C none -A arm -T script -d boot.cmd boot.scr
         
     - name: Upload artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: rk322x-build-artifacts
+        name: armbian-build
         path: |
-          output/debs/linux-*
-          output/debs/u-boot-*
-          output/images/u-boot-*
-          build.log
-        if-no-files-found: error
-        retention-days: 5
+          output/images/*
+          *.log
+          boot.scr
+        retention-days: 3
